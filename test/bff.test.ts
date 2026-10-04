@@ -178,6 +178,13 @@ describe("platform", () => {
     expect(response.headers["access-control-allow-headers"]).toContain("authorization");
   });
 
+  it("describes itself at the root instead of a bare 404", async () => {
+    const { app: bff } = app();
+    const response = await bff.inject({ method: "GET", url: "/" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ service: "wmd-bff", routes: expect.arrayContaining(["POST /v1/session"]) });
+  });
+
   it("serves health and request metrics", async () => {
     const { app: bff } = app({ "GET http://catalog/v1/products": [200, []] });
     expect((await bff.inject({ method: "GET", url: "/healthz" })).json()).toEqual({ status: "ok" });
