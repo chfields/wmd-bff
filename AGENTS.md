@@ -4,6 +4,10 @@ TypeScript (Node 24), Fastify. The mobile backend-for-frontend: the only API
 wmd-app calls. It signs users in and composes catalog-service, order-service
 and notification-service. It has no database.
 
+## Architecture knowledge
+
+See [docs/knowledge/index.md](docs/knowledge/index.md) for architecture knowledge.
+
 ## Run the checks
 
 ```bash
