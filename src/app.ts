@@ -132,6 +132,21 @@ export function buildApp(config: BffConfig): FastifyInstance {
 
   const userOf = (request: FastifyRequest): User => request.user as User;
 
+  app.get("/", async () => ({
+    service: "wmd-bff",
+    description: "WMD Shop mobile API. The app talks only to this service.",
+    routes: [
+      "POST /v1/session",
+      "GET /v1/catalog/products?q=",
+      "POST /v1/orders",
+      "GET /v1/orders",
+      "GET /v1/orders/{id}",
+      "GET /v1/notifications",
+      "GET /healthz",
+      "GET /readyz",
+      "GET /metrics",
+    ],
+  }));
   app.get("/healthz", async () => ({ status: "ok" }));
   app.get("/readyz", async () => ({ status: "ready" }));
   app.get("/metrics", async (_request, reply) => {

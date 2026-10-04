@@ -11,6 +11,7 @@ only to this service.
 | `GET /v1/orders` | Bearer | The user's orders |
 | `GET /v1/orders/{id}` | Bearer | One of the user's orders |
 | `GET /v1/notifications` | Bearer | The user's notifications |
+| `GET /` | — | What this service is and its routes |
 | `GET /healthz`, `/readyz`, `/metrics` | — | Health, readiness, metrics |
 
 Configuration: `CATALOG_URL`, `ORDER_URL`, `NOTIFICATION_URL`, `AUTH_SECRET`,
