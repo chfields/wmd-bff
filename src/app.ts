@@ -193,6 +193,12 @@ export function buildApp(config: BffConfig): FastifyInstance {
     "/v1/orders",
     {
       preHandler: authenticate,
+      preValidation: async (request) => {
+        const body = request.body as { giftMessage?: unknown } | null;
+        if (body && typeof body === "object" && "giftMessage" in body && typeof body.giftMessage !== "string") {
+          throw new ApiError(400, "invalid_request", "giftMessage must be a string.");
+        }
+      },
       schema: {
         body: {
           type: "object",
@@ -213,15 +219,16 @@ export function buildApp(config: BffConfig): FastifyInstance {
                 },
               },
             },
+            giftMessage: { type: "string", maxLength: 200 },
           },
         },
       },
     },
     async (request, reply: FastifyReply) => {
-      const { items } = request.body as { items: unknown[] };
+      const { items, giftMessage } = request.body as { items: unknown[]; giftMessage?: string };
       const order = await call(request, config.orderUrl, "/v1/orders", {
         method: "POST",
-        body: JSON.stringify({ userId: userOf(request).id, items }),
+        body: JSON.stringify({ userId: userOf(request).id, items, ...(giftMessage === undefined ? {} : { giftMessage }) }),
       });
       return reply.code(201).send(order);
     },
