@@ -6,7 +6,7 @@ only to this service.
 | Route | Auth | Purpose |
 |---|---|---|
 | `POST /v1/session` | — | Sign in; returns `{ token, user }` |
-| `GET /v1/catalog/products?q=` | — | Products from catalog-service, including catalog-provided `lowStock` and `restockDate` |
+| `GET /v1/catalog/products?q=` | — | Forwards catalog-service product fields unchanged (including `restockDate` once catalog-service adds it) |
 | `POST /v1/orders` | Bearer | Place an order for the signed-in user, optionally with a gift message |
 | `GET /v1/orders` | Bearer | The user's orders |
 | `GET /v1/orders/{id}` | Bearer | One of the user's orders |
