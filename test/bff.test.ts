@@ -90,6 +90,53 @@ describe("catalog", () => {
     expect(response.json()).toEqual([{ id: "sku-coffee" }]);
     expect(calls).toHaveLength(1);
   });
+
+  it("passes catalog products through unchanged, including lowStock", async () => {
+    const products = [
+      {
+        id: "sku-coffee",
+        name: "Cold brew",
+        description: "Ready to drink.",
+        priceCents: 499,
+        stock: 3,
+        available: true,
+        lowStock: true,
+      },
+      {
+        id: "sku-eggs",
+        name: "Eggs",
+        description: "A dozen.",
+        priceCents: 399,
+        stock: 0,
+        available: false,
+        lowStock: false,
+      },
+      {
+        id: "sku-mug",
+        name: "Mug",
+        description: "Ceramic.",
+        priceCents: 1299,
+        stock: 40,
+        available: true,
+        lowStock: false,
+      },
+      {
+        id: "sku-legacy",
+        name: "Legacy product",
+        description: "From an older catalog.",
+        priceCents: 999,
+        stock: 4,
+        available: true,
+      },
+    ];
+    const { app: bff } = app({ "GET http://catalog/v1/products": [200, products] });
+
+    for (const url of ["/v1/catalog/products", "/v1/catalog/products?q="]) {
+      const response = await bff.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(products);
+    }
+  });
 });
 
 describe("orders", () => {
