@@ -91,7 +91,7 @@ describe("catalog", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("passes catalog products through unchanged, including lowStock", async () => {
+  it("passes catalog products through unchanged, including lowStock and restockDate", async () => {
     const products = [
       {
         id: "sku-coffee",
@@ -101,6 +101,7 @@ describe("catalog", () => {
         stock: 3,
         available: true,
         lowStock: true,
+        restockDate: null,
       },
       {
         id: "sku-eggs",
@@ -110,6 +111,7 @@ describe("catalog", () => {
         stock: 0,
         available: false,
         lowStock: false,
+        restockDate: "2026-10-20",
       },
       {
         id: "sku-mug",
@@ -119,6 +121,7 @@ describe("catalog", () => {
         stock: 40,
         available: true,
         lowStock: false,
+        restockDate: null,
       },
       {
         id: "sku-legacy",
@@ -127,6 +130,7 @@ describe("catalog", () => {
         priceCents: 999,
         stock: 4,
         available: true,
+        restockDate: null,
       },
     ];
     const { app: bff } = app({ "GET http://catalog/v1/products": [200, products] });
