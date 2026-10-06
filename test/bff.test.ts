@@ -91,7 +91,7 @@ describe("catalog", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("passes catalog products through unchanged, including lowStock", async () => {
+  it("passes catalog products through unchanged, including lowStock and restockDate", async () => {
     const products = [
       {
         id: "sku-coffee",
@@ -101,6 +101,7 @@ describe("catalog", () => {
         stock: 3,
         available: true,
         lowStock: true,
+        restockDate: "2026-10-20",
       },
       {
         id: "sku-eggs",
@@ -110,6 +111,7 @@ describe("catalog", () => {
         stock: 0,
         available: false,
         lowStock: false,
+        restockDate: null,
       },
       {
         id: "sku-mug",
@@ -129,9 +131,12 @@ describe("catalog", () => {
         available: true,
       },
     ];
-    const { app: bff } = app({ "GET http://catalog/v1/products": [200, products] });
+    const { app: bff } = app({
+      "GET http://catalog/v1/products": [200, products],
+      "GET http://catalog/v1/products?q=cold%20brew": [200, products],
+    });
 
-    for (const url of ["/v1/catalog/products", "/v1/catalog/products?q="]) {
+    for (const url of ["/v1/catalog/products", "/v1/catalog/products?q=cold%20brew"]) {
       const response = await bff.inject({ method: "GET", url });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual(products);
