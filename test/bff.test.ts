@@ -88,7 +88,39 @@ describe("catalog", () => {
     const { app: bff, calls } = app({ "GET http://catalog/v1/products?q=cold%20brew": [200, [{ id: "sku-coffee" }]] });
     const response = await bff.inject({ method: "GET", url: "/v1/catalog/products?q=cold%20brew" });
     expect(response.json()).toEqual([{ id: "sku-coffee" }]);
-    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("http://catalog/v1/products?q=cold%20brew");
+  });
+
+  it("leaves the upstream path unchanged when no sort is provided", async () => {
+    const { app: bff, calls } = app({ "GET http://catalog/v1/products": [200, []] });
+    const response = await bff.inject({ method: "GET", url: "/v1/catalog/products" });
+    expect(response.statusCode).toBe(200);
+    expect(calls[0]?.url).toBe("http://catalog/v1/products");
+  });
+
+  it.each(["featured", "price_asc", "price_desc", "name_asc"])("forwards sort=%s to catalog", async (sort) => {
+    const { app: bff, calls } = app({ [`GET http://catalog/v1/products?sort=${sort}`]: [200, []] });
+    const response = await bff.inject({ method: "GET", url: `/v1/catalog/products?sort=${sort}` });
+    expect(response.statusCode).toBe(200);
+    expect(calls[0]?.url).toBe(`http://catalog/v1/products?sort=${sort}`);
+  });
+
+  it("forwards encoded query and sort together", async () => {
+    const { app: bff, calls } = app({ "GET http://catalog/v1/products?q=cold%20%26%20brew&sort=price_desc": [200, []] });
+    const response = await bff.inject({
+      method: "GET",
+      url: "/v1/catalog/products?q=cold%20%26%20brew&sort=price_desc",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls[0]?.url).toBe("http://catalog/v1/products?q=cold%20%26%20brew&sort=price_desc");
+  });
+
+  it("refuses an invalid sort without calling catalog", async () => {
+    const { app: bff, calls } = app();
+    const response = await bff.inject({ method: "GET", url: "/v1/catalog/products?sort=popular" });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("invalid_request");
+    expect(calls).toEqual([]);
   });
 
   it("passes catalog products through unchanged, including lowStock and restockDate", async () => {
@@ -272,11 +304,11 @@ describe("notifications", () => {
 });
 
 describe("platform", () => {
-  it("forwards the caller's correlation id to services and echoes it", async () => {
-    const { app: bff, calls } = app({ "GET http://catalog/v1/products": [200, []] });
+  it("forwards the caller's correlation id to catalog and echoes it", async () => {
+    const { app: bff, calls } = app({ "GET http://catalog/v1/products?sort=name_asc": [200, []] });
     const response = await bff.inject({
       method: "GET",
-      url: "/v1/catalog/products",
+      url: "/v1/catalog/products?sort=name_asc",
       headers: { "x-correlation-id": "journey-7" },
     });
     expect(response.headers["x-correlation-id"]).toBe("journey-7");
@@ -295,7 +327,10 @@ describe("platform", () => {
     const { app: bff } = app();
     const response = await bff.inject({ method: "GET", url: "/" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ service: "wmd-bff", routes: expect.arrayContaining(["POST /v1/session"]) });
+    expect(response.json()).toMatchObject({
+      service: "wmd-bff",
+      routes: expect.arrayContaining(["POST /v1/session", "GET /v1/catalog/products?q=&sort="]),
+    });
   });
 
   it("serves health and request metrics", async () => {
