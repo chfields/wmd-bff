@@ -47,7 +47,15 @@ function app(routes: Record<string, [number, unknown] | Error> = {}) {
 }
 
 const auth = { authorization: `Bearer ${signToken(SECRET, DEMO)}` };
-const ORDER = { id: "o-1", userId: "user-demo", status: "confirmed", totalCents: 899, lines: [], giftMessage: null };
+const ORDER = {
+  id: "o-1",
+  userId: "user-demo",
+  status: "confirmed",
+  totalCents: 899,
+  lines: [],
+  giftMessage: null,
+  deliveryWindow: "morning",
+};
 
 describe("session", () => {
   it("signs the demo user in, case-insensitively by email", async () => {
@@ -145,7 +153,7 @@ describe("catalog", () => {
 });
 
 describe("orders", () => {
-  it("places an order for the signed-in user, never one the app names", async () => {
+  it("places an order for the signed-in user and omits deliveryWindow downstream when absent", async () => {
     const { app: bff, calls } = app({ "POST http://orders/v1/orders": [201, ORDER] });
     const response = await bff.inject({
       method: "POST",
@@ -156,6 +164,24 @@ describe("orders", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual(ORDER);
     expect(calls[0]?.body).toEqual({ userId: "user-demo", items: [{ productId: "sku-coffee", quantity: 1 }] });
+  });
+
+  it.each(["morning", "afternoon", "evening"] as const)("forwards the %s delivery window", async (deliveryWindow) => {
+    const order = { ...ORDER, deliveryWindow };
+    const { app: bff, calls } = app({ "POST http://orders/v1/orders": [201, order] });
+    const response = await bff.inject({
+      method: "POST",
+      url: "/v1/orders",
+      headers: auth,
+      payload: { items: [{ productId: "sku-coffee", quantity: 1 }], deliveryWindow },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual(order);
+    expect(calls[0]?.body).toEqual({
+      userId: "user-demo",
+      items: [{ productId: "sku-coffee", quantity: 1 }],
+      deliveryWindow,
+    });
   });
 
   it("forwards an optional gift message with the signed-in user's id", async () => {
@@ -186,6 +212,22 @@ describe("orders", () => {
       url: "/v1/orders",
       headers: auth,
       payload: { items: [{ productId: "sku-coffee", quantity: 1 }], giftMessage },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("invalid_request");
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ["an unknown delivery window", "overnight"],
+    ["a non-string delivery window", 123],
+  ])("refuses %s", async (_description, deliveryWindow) => {
+    const { app: bff, calls } = app();
+    const response = await bff.inject({
+      method: "POST",
+      url: "/v1/orders",
+      headers: auth,
+      payload: { items: [{ productId: "sku-coffee", quantity: 1 }], deliveryWindow },
     });
     expect(response.statusCode).toBe(400);
     expect(response.json().error.code).toBe("invalid_request");
@@ -237,12 +279,17 @@ describe("orders", () => {
     });
   });
 
-  it("passes giftMessage through when retrieving an order", async () => {
-    const order = { ...ORDER, giftMessage: "Happy birthday!" };
-    const { app: bff } = app({ "GET http://orders/v1/orders/o-1": [200, order] });
-    const response = await bff.inject({ method: "GET", url: "/v1/orders/o-1", headers: auth });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(order);
+  it("passes giftMessage and deliveryWindow through when retrieving orders", async () => {
+    const order = { ...ORDER, giftMessage: "Happy birthday!", deliveryWindow: "evening" };
+    const { app: bff } = app({
+      "GET http://orders/v1/orders?userId=user-demo": [200, [order]],
+      "GET http://orders/v1/orders/o-1": [200, order],
+    });
+    for (const url of ["/v1/orders", "/v1/orders/o-1"]) {
+      const response = await bff.inject({ method: "GET", url, headers: auth });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(url === "/v1/orders" ? [order] : order);
+    }
   });
 
   it("hides another user's order behind a 404", async () => {
