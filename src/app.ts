@@ -137,7 +137,7 @@ export function buildApp(config: BffConfig): FastifyInstance {
     description: "WMD Shop mobile API. The app talks only to this service.",
     routes: [
       "POST /v1/session",
-      "GET /v1/catalog/products?q=",
+      "GET /v1/catalog/products?q=&sort=",
       "POST /v1/orders",
       "GET /v1/orders",
       "GET /v1/orders/{id}",
@@ -182,10 +182,24 @@ export function buildApp(config: BffConfig): FastifyInstance {
 
   app.get(
     "/v1/catalog/products",
-    { schema: { querystring: { type: "object", properties: { q: { type: "string", maxLength: 100 } } } } },
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            q: { type: "string", maxLength: 100 },
+            sort: { type: "string", enum: ["featured", "price_asc", "price_desc", "name_asc"] },
+          },
+        },
+      },
+    },
     async (request) => {
-      const { q } = request.query as { q?: string };
-      return call(request, config.catalogUrl, q ? `/v1/products?q=${encodeURIComponent(q)}` : "/v1/products");
+      const { q, sort } = request.query as { q?: string; sort?: string };
+      const query = [q ? `q=${encodeURIComponent(q)}` : "", sort ? `sort=${encodeURIComponent(sort)}` : ""]
+        .filter(Boolean)
+        .join("&");
+      return call(request, config.catalogUrl, query ? `/v1/products?${query}` : "/v1/products");
     },
   );
 
