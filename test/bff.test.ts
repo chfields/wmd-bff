@@ -47,7 +47,15 @@ function app(routes: Record<string, [number, unknown] | Error> = {}) {
 }
 
 const auth = { authorization: `Bearer ${signToken(SECRET, DEMO)}` };
-const ORDER = { id: "o-1", userId: "user-demo", status: "confirmed", totalCents: 899, lines: [], giftMessage: null };
+const ORDER = {
+  id: "o-1",
+  userId: "user-demo",
+  status: "confirmed",
+  totalCents: 899,
+  lines: [],
+  giftMessage: null,
+  deliveryWindow: "morning",
+};
 
 describe("session", () => {
   it("signs the demo user in, case-insensitively by email", async () => {
@@ -208,6 +216,38 @@ describe("orders", () => {
     });
   });
 
+  it.each(["morning", "afternoon", "evening"] as const)("forwards deliveryWindow=%s to order-service", async (deliveryWindow) => {
+    const order = { ...ORDER, deliveryWindow };
+    const { app: bff, calls } = app({ "POST http://orders/v1/orders": [201, order] });
+    const response = await bff.inject({
+      method: "POST",
+      url: "/v1/orders",
+      headers: { ...auth, "x-correlation-id": "order-window-7" },
+      payload: { items: [{ productId: "sku-coffee", quantity: 1 }], deliveryWindow },
+    });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual(order);
+    expect(calls[0]?.body).toEqual({
+      userId: "user-demo",
+      items: [{ productId: "sku-coffee", quantity: 1 }],
+      deliveryWindow,
+    });
+    expect(calls[0]?.correlationId).toBe("order-window-7");
+  });
+
+  it.each(["night", 123])("refuses an invalid delivery window of %j without calling order-service", async (deliveryWindow) => {
+    const { app: bff, calls } = app();
+    const response = await bff.inject({
+      method: "POST",
+      url: "/v1/orders",
+      headers: auth,
+      payload: { items: [{ productId: "sku-coffee", quantity: 1 }], deliveryWindow },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe("invalid_request");
+    expect(calls).toEqual([]);
+  });
+
   it.each([
     ["a message longer than 200 characters", "x".repeat(201)],
     ["a non-string message", 123],
@@ -269,12 +309,20 @@ describe("orders", () => {
     });
   });
 
-  it("passes giftMessage through when retrieving an order", async () => {
-    const order = { ...ORDER, giftMessage: "Happy birthday!" };
+  it("passes giftMessage and deliveryWindow through when retrieving an order", async () => {
+    const order = { ...ORDER, giftMessage: "Happy birthday!", deliveryWindow: "evening" };
     const { app: bff } = app({ "GET http://orders/v1/orders/o-1": [200, order] });
     const response = await bff.inject({ method: "GET", url: "/v1/orders/o-1", headers: auth });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(order);
+  });
+
+  it("passes deliveryWindow through when listing orders", async () => {
+    const orders = [{ ...ORDER, deliveryWindow: "afternoon" }];
+    const { app: bff } = app({ "GET http://orders/v1/orders?userId=user-demo": [200, orders] });
+    const response = await bff.inject({ method: "GET", url: "/v1/orders", headers: auth });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(orders);
   });
 
   it("hides another user's order behind a 404", async () => {

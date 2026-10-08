@@ -234,15 +234,25 @@ export function buildApp(config: BffConfig): FastifyInstance {
               },
             },
             giftMessage: { type: "string", maxLength: 200 },
+            deliveryWindow: { type: "string", enum: ["morning", "afternoon", "evening"] },
           },
         },
       },
     },
     async (request, reply: FastifyReply) => {
-      const { items, giftMessage } = request.body as { items: unknown[]; giftMessage?: string };
+      const { items, giftMessage, deliveryWindow } = request.body as {
+        items: unknown[];
+        giftMessage?: string;
+        deliveryWindow?: "morning" | "afternoon" | "evening";
+      };
       const order = await call(request, config.orderUrl, "/v1/orders", {
         method: "POST",
-        body: JSON.stringify({ userId: userOf(request).id, items, ...(giftMessage === undefined ? {} : { giftMessage }) }),
+        body: JSON.stringify({
+          userId: userOf(request).id,
+          items,
+          ...(giftMessage === undefined ? {} : { giftMessage }),
+          ...(deliveryWindow === undefined ? {} : { deliveryWindow }),
+        }),
       });
       return reply.code(201).send(order);
     },
