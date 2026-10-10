@@ -314,7 +314,7 @@ describe("orders", () => {
     const { app: bff } = app({ "GET http://orders/v1/orders/o-1": [200, order] });
     const response = await bff.inject({ method: "GET", url: "/v1/orders/o-1", headers: auth });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(order);
+    expect(response.json()).toEqual({ ...order, itemCount: 0 });
   });
 
   it("passes deliveryWindow through when listing orders", async () => {
@@ -322,7 +322,30 @@ describe("orders", () => {
     const { app: bff } = app({ "GET http://orders/v1/orders?userId=user-demo": [200, orders] });
     const response = await bff.inject({ method: "GET", url: "/v1/orders", headers: auth });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual(orders);
+    expect(response.json()).toEqual([{ ...orders[0], itemCount: 0 }]);
+  });
+
+  it("adds itemCount to listed and individual orders", async () => {
+    const order = {
+      ...ORDER,
+      lines: [
+        { productId: "sku-coffee", name: "Cold brew", quantity: 2, priceCents: 499 },
+        { productId: "sku-eggs", name: "Eggs", quantity: 3, priceCents: 399 },
+      ],
+    };
+    const emptyOrder = { ...ORDER, id: "o-2", lines: [] };
+    const { app: bff } = app({
+      "GET http://orders/v1/orders?userId=user-demo": [200, [order, emptyOrder]],
+      "GET http://orders/v1/orders/o-1": [200, order],
+    });
+
+    const listResponse = await bff.inject({ method: "GET", url: "/v1/orders", headers: auth });
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual([{ ...order, itemCount: 5 }, { ...emptyOrder, itemCount: 0 }]);
+
+    const orderResponse = await bff.inject({ method: "GET", url: "/v1/orders/o-1", headers: auth });
+    expect(orderResponse.statusCode).toBe(200);
+    expect(orderResponse.json()).toEqual({ ...order, itemCount: 5 });
   });
 
   it("hides another user's order behind a 404", async () => {
