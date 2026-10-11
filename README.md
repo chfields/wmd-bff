@@ -8,8 +8,8 @@ only to this service.
 | `POST /v1/session` | — | Sign in; returns `{ token, user }` |
 | `GET /v1/catalog/products?q=&sort=` | — | Products from catalog-service, including catalog-provided `lowStock` and `restockDate` |
 | `POST /v1/orders` | Bearer | Place an order for the signed-in user, optionally with a gift message and delivery window (`morning`, `afternoon`, or `evening`) |
-| `GET /v1/orders` | Bearer | The user's orders |
-| `GET /v1/orders/{id}` | Bearer | One of the user's orders |
+| `GET /v1/orders` | Bearer | The user's orders, each with BFF-computed `itemCount` |
+| `GET /v1/orders/{id}` | Bearer | One of the user's orders, with BFF-computed `itemCount` |
 | `GET /v1/notifications` | Bearer | The user's notifications |
 | `GET /` | — | What this service is and its routes |
 | `GET /healthz`, `/readyz`, `/metrics` | — | Health, readiness, metrics |

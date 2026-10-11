@@ -17,6 +17,11 @@ export interface BffConfig {
   fetch?: typeof fetch;
 }
 
+interface Order {
+  lines?: Array<{ quantity: number }>;
+  [field: string]: unknown;
+}
+
 const CORRELATION_HEADER = "x-correlation-id";
 const VALID_CORRELATION = /^[A-Za-z0-9._-]{1,128}$/;
 
@@ -131,6 +136,10 @@ export function buildApp(config: BffConfig): FastifyInstance {
   }
 
   const userOf = (request: FastifyRequest): User => request.user as User;
+  const withItemCount = (order: Order) => ({
+    ...order,
+    itemCount: (order.lines ?? []).reduce((count, line) => count + line.quantity, 0),
+  });
 
   app.get("/", async () => ({
     service: "wmd-bff",
@@ -258,18 +267,17 @@ export function buildApp(config: BffConfig): FastifyInstance {
     },
   );
 
-  app.get("/v1/orders", { preHandler: authenticate }, async (request) =>
-    call(request, config.orderUrl, `/v1/orders?userId=${encodeURIComponent(userOf(request).id)}`),
-  );
+  app.get("/v1/orders", { preHandler: authenticate }, async (request) => {
+    const orders = (await call(request, config.orderUrl, `/v1/orders?userId=${encodeURIComponent(userOf(request).id)}`)) as Order[];
+    return orders.map(withItemCount);
+  });
 
   app.get("/v1/orders/:id", { preHandler: authenticate }, async (request) => {
     const { id } = request.params as { id: string };
-    const order = (await call(request, config.orderUrl, `/v1/orders/${encodeURIComponent(id)}`)) as {
-      userId?: string;
-    };
+    const order = (await call(request, config.orderUrl, `/v1/orders/${encodeURIComponent(id)}`)) as Order & { userId?: string };
     // Someone else's order looks exactly like one that doesn't exist.
     if (order.userId !== userOf(request).id) throw new ApiError(404, "unknown_order", `No order ${id}.`);
-    return order;
+    return withItemCount(order);
   });
 
   app.get("/v1/notifications", { preHandler: authenticate }, async (request) =>
